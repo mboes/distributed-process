@@ -101,8 +101,7 @@ fetch mxId@(MxForAgent _) key = do
   (sp, rp) <- newChan :: Process (SendPort (Maybe Message),
                                   ReceivePort (Maybe Message))
   sendReq (Get key sp) mxId
-  receiveChan rp >>= maybe (return Nothing)
-                           (unwrapMessage :: Message -> Process (Maybe a))
+  receiveChan rp >>= return . (>>= unwrapMessage)
 
 -- [note: un-typed send port]
 -- Here, fetch uses a typed channel over a raw Message to obtain
@@ -117,8 +116,7 @@ get :: forall a. (Serializable a)
       -> String
       -> Process (Maybe a)
 get pid key = do
-  safeFetch pid key >>= maybe (return Nothing)
-                              (unwrapMessage :: Message -> Process (Maybe a))
+  safeFetch pid key >>= return . (>>= unwrapMessage)
 
 safeFetch :: ProcessId -> String -> Process (Maybe Message)
 safeFetch pid key = do
@@ -216,4 +214,3 @@ getEntry k m MxTableState{..} = do
 
 entries :: Accessor MxTableState (Map String Message)
 entries = accessor _entries (\ls st -> st { _entries = ls })
-

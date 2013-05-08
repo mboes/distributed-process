@@ -438,10 +438,10 @@ wrapMessage = createUnencodedMessage -- see [note Serializable UnencodedMessage]
 -- Whereas this expression, will yield @Just "foo"@
 -- > unwrapMessage (wrapMessage "foo") :: Process (Maybe String)
 --
-unwrapMessage :: forall m a. (Monad m, Serializable a) => Message -> m (Maybe a)
+unwrapMessage :: forall a. Serializable a => Message -> Maybe a
 unwrapMessage msg
-    | messageFingerprint msg == fingerprint (undefined :: a) = return $ Just decoded
-    | otherwise = return Nothing
+    | messageFingerprint msg == fingerprint (undefined :: a) = Just decoded
+    | otherwise = Nothing
   where
     decoded :: a -- note [decoding]
     !decoded = case msg of

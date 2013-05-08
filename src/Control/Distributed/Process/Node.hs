@@ -351,7 +351,7 @@ forkProcess node proc = modifyMVar (localState node) startProcess
           reason <- Exception.catches
             (runLocalProcess lproc proc >> return DiedNormal)
             [ (Exception.Handler (\ex@(ProcessExitException from msg) -> do
-                 mMsg <- unwrapMessage msg :: IO (Maybe String)
+                 let mMsg = unwrapMessage msg
                  case mMsg of
                    Nothing -> return $ DiedException $ show ex
                    Just m  -> return $ DiedException ("exit-from=" ++ (show from) ++ ",reason=" ++ m)))

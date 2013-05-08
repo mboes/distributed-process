@@ -903,7 +903,7 @@ testMatchMessageWithUnwrap :: NT.Transport -> Assertion
 testMatchMessageWithUnwrap transport = do
   echoAddr <- newEmptyMVar
   clientDone <- newEmptyMVar
-  
+
     -- echo server
   forkIO $ do
     localNode <- newLocalNode transport initRemoteTable
@@ -912,8 +912,7 @@ testMatchMessageWithUnwrap transport = do
             matchMessage (\(m :: Message) -> do
                             return m)
           ]
-        unwrapped <- unwrapMessage msg :: Process (Maybe (ProcessId, Message))
-        case unwrapped of
+        case unwrapMessage msg of
           (Just (p, msg')) -> forward msg' p
           Nothing -> die "unable to unwrap the message"
     putMVar echoAddr echoServer

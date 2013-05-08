@@ -189,7 +189,7 @@ mxSink :: forall s m . (Serializable m)
        => (m -> MxAgent s MxAction)
        -> MxSink s
 mxSink act msg = do
-  msg' <- liftMX $ (unwrapMessage msg :: Process (Maybe m))
+  msg' <- liftMX $ return $ unwrapMessage msg
   case msg' of
     Nothing -> return Nothing
     Just m  -> act m >>= return . Just
@@ -246,4 +246,3 @@ mxAgent mxId initState handlers = do
       case pass of
         Nothing     -> runPipeline msg state next
         Just result -> return (result, state')
-

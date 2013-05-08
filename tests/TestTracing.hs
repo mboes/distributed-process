@@ -118,7 +118,7 @@ testTraceSending result = do
       (\ev ->
         case ev of
           (MxSent to from msg) -> do
-            (Just s) <- unwrapMessage msg :: Process (Maybe String)
+            let Just s = unwrapMessage msg :: Maybe String
             stash res (to == pid && from == self && s == "hello there")
             stash res (to == pid && from == self)
           _ ->
@@ -332,4 +332,3 @@ timerTests _ = do
 
 main :: IO ()
 main = testMain $ timerTests
-
