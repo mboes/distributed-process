@@ -218,7 +218,7 @@ send them msg = do
   let us       = processId proc
       node     = processNode proc
       nodeId   = localNodeId node
-      destNode = (processNodeId them) in do
+      destNode = (processNodeId them)
   case destNode == nodeId of
     True  -> sendLocal them msg
     False -> liftIO $ sendMessage (processNode proc)
@@ -275,7 +275,7 @@ sendChan :: Serializable a => SendPort a -> a -> Process ()
 sendChan (SendPort cid) msg = do
   proc <- ask
   let node     = localNodeId (processNode proc)
-      destNode = processNodeId (sendPortProcessId cid) in do
+      destNode = processNodeId (sendPortProcessId cid)
   case destNode == node of
     True  -> sendChanLocal cid msg
     False -> do
@@ -402,7 +402,7 @@ forward msg them = do
   let node     = processNode proc
       us       = processId proc
       nid      = localNodeId node
-      destNode = (processNodeId them) in do
+      destNode = (processNodeId them)
   case destNode == nid of
     True  -> sendCtrlMsg Nothing (LocalSend them msg)
     False -> liftIO $ sendPayload (processNode proc)
@@ -485,8 +485,8 @@ handleMessageIf msg c proc = do
   case messageFingerprint msg == fingerprint (undefined :: a) of
     False -> return Nothing :: m (Maybe b)
     True  -> case msg of
-      (UnencodedMessage _ ms) ->
-        let ms' = unsafeCoerce ms :: a in
+      (UnencodedMessage _ ms) -> do
+        let ms' = unsafeCoerce ms :: a
         case (c ms') of
           True  -> do { r <- proc ms'; return (Just r) }
           False -> return Nothing :: m (Maybe b)
@@ -674,8 +674,8 @@ getSelfNode = localNodeId . processNode <$> ask
 
 -- | Get information about the specified process
 getProcessInfo :: ProcessId -> Process (Maybe ProcessInfo)
-getProcessInfo pid =
-  let them = processNodeId pid in do
+getProcessInfo pid = do
+  let them = processNodeId pid
   us <- getSelfNode
   dest <- mkNode them us
   sendCtrlMsg dest $ GetInfo pid

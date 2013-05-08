@@ -938,10 +938,9 @@ ncEffectExit from to reason = do
 
 -- [Issue #89]
 ncEffectGetInfo :: ProcessId -> ProcessId -> NC ()
-ncEffectGetInfo from pid =
+ncEffectGetInfo from pid = do
   let lpid = processLocalId pid
       them = (ProcessIdentifier pid)
-  in do
   node <- ask
   mProc <- liftIO $
             withMVar (localState node) $ return . (^. localProcessWithId lpid)
