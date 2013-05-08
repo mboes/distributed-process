@@ -112,7 +112,7 @@ import Data.Time.Clock (getCurrentTime)
 import Data.Time.Format (formatTime)
 import System.Locale (defaultTimeLocale)
 import System.Timeout (timeout)
-import Control.Monad (when)
+import Control.Monad (ap, when)
 import Control.Monad.Reader (ask)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Applicative ((<$>))
@@ -364,21 +364,16 @@ match = matchIf (const True)
 matchIf :: forall a b. Serializable a => (a -> Bool) -> (a -> Process b) -> Match b
 matchIf c p = Match $ MatchMsg $ \msg ->
   case messageFingerprint msg == fingerprint (undefined :: a) of
-    False -> Nothing
-    True  -> case msg of
-      (UnencodedMessage _ m) ->
-        let m' = unsafeCoerce m :: a in
-        case (c m') of
-          True  -> Just (p m')
-          False -> Nothing
-      (EncodedMessage _ _) ->
-        if (c decoded) then Just (p decoded) else Nothing
-        where
-          decoded :: a
-            -- Make sure the value is fully decoded so that we don't hang to
-            -- bytestrings when the process calling 'matchIf' doesn't process
-            -- the values immediately
-          !decoded = decode (messageEncoding msg)
+    True | c decoded -> Just (p decoded)
+      where
+        -- Make sure the value is fully decoded so that we don't hang to
+        -- bytestrings when the process calling 'matchIf' doesn't process
+        -- the values immediately
+        decoded :: a
+        !decoded = case msg of
+            UnencodedMessage _ x -> unsafeCoerce x
+            _ -> decode (messageEncoding msg)
+    _ -> Nothing
 
 -- | Match against any message, regardless of the underlying (contained) type
 matchMessage :: (Message -> Process Message) -> Match Message
@@ -444,18 +439,14 @@ wrapMessage = createUnencodedMessage -- see [note Serializable UnencodedMessage]
 -- > unwrapMessage (wrapMessage "foo") :: Process (Maybe String)
 --
 unwrapMessage :: forall m a. (Monad m, Serializable a) => Message -> m (Maybe a)
-unwrapMessage msg =
-  case messageFingerprint msg == fingerprint (undefined :: a) of
-    False -> return Nothing :: m (Maybe a)
-    True  -> case msg of
-      (UnencodedMessage _ ms) ->
-        let ms' = unsafeCoerce ms :: a
-        in return (Just ms')
-      (EncodedMessage _ _) ->
-        return (Just (decoded))
-        where
-          decoded :: a -- note [decoding]
-          !decoded = decode (messageEncoding msg)
+unwrapMessage msg
+    | messageFingerprint msg == fingerprint (undefined :: a) = return $ Just decoded
+    | otherwise = return Nothing
+  where
+    decoded :: a -- note [decoding]
+    !decoded = case msg of
+        UnencodedMessage _ ms -> unsafeCoerce ms
+        EncodedMessage{messageEncoding=enc} -> decode enc
 
 -- | Attempt to handle a raw 'Message'.
 -- If the type of the message matches the type of the first argument to
@@ -475,22 +466,15 @@ handleMessageIf :: forall m a b . (Monad m, Serializable a)
                 -> (a -> Bool)
                 -> (a -> m b)
                 -> m (Maybe b)
-handleMessageIf msg c proc = do
-  case messageFingerprint msg == fingerprint (undefined :: a) of
-    False -> return Nothing :: m (Maybe b)
-    True  -> case msg of
-      (UnencodedMessage _ ms) -> do
-        let ms' = unsafeCoerce ms :: a
-        case (c ms') of
-          True  -> do { r <- proc ms'; return (Just r) }
-          False -> return Nothing :: m (Maybe b)
-      (EncodedMessage _ _) ->
-        case (c decoded) of
-          True  -> do { r <- proc (decoded :: a); return (Just r) }
-          False -> return Nothing :: m (Maybe b)
-        where
-          decoded :: a -- note [decoding]
-          !decoded = decode (messageEncoding msg)
+handleMessageIf msg c proc
+    | messageFingerprint msg == fingerprint (undefined :: a) && c decoded = do
+        return Just `ap` proc decoded
+    | otherwise = return Nothing
+  where
+    decoded :: a -- note [decoding]
+    !decoded = case msg of
+        UnencodedMessage _ ms -> unsafeCoerce ms
+        EncodedMessage{messageEncoding = enc} -> decode enc
 
 -- | Match against an arbitrary message. 'matchAny' removes the first available
 -- message from the process mailbox. To handle arbitrary /raw/ messages once
@@ -514,16 +498,12 @@ matchAnyIf :: forall a b. (Serializable a)
                        -> Match b
 matchAnyIf c p = Match $ MatchMsg $ \msg ->
   case messageFingerprint msg == fingerprint (undefined :: a) of
-     True | check -> Just (p msg)
+     True | c decoded -> Just (p msg)
        where
-         check :: Bool
-         !check =
-           case msg of
-             (EncodedMessage _ _)    -> c decoded
-             (UnencodedMessage _ m') -> c (unsafeCoerce m')
-
-         decoded :: a -- note [decoding]
-         !decoded = decode (messageEncoding msg)
+         decoded :: a
+         !decoded = case msg of
+             UnencodedMessage _ x -> unsafeCoerce x
+             _ -> decode (messageEncoding msg)
      _ -> Nothing
 
 {- note [decoding]
