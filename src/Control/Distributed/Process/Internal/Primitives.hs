@@ -215,11 +215,9 @@ send :: Serializable a => ProcessId -> a -> Process ()
 -- modify serializable to allow for stateful (IO) deserialization.
 send them msg = do
   proc <- ask
-  let us       = processId proc
-      node     = processNode proc
-      nodeId   = localNodeId node
-      destNode = (processNodeId them)
-  case destNode == nodeId of
+  let us   = processId proc
+      node = processNode proc
+  case isLocal proc them of
     True  -> sendLocal them msg
     False -> liftIO $ sendMessage (processNode proc)
                                   (ProcessIdentifier (processId proc))
@@ -274,9 +272,7 @@ newChan = do
 sendChan :: Serializable a => SendPort a -> a -> Process ()
 sendChan (SendPort cid) msg = do
   proc <- ask
-  let node     = localNodeId (processNode proc)
-      destNode = processNodeId (sendPortProcessId cid)
-  case destNode == node of
+  case isLocal proc (sendPortProcessId cid) of
     True  -> sendChanLocal cid msg
     False -> do
       liftIO $ sendBinary (processNode proc)
@@ -399,14 +395,12 @@ matchMessageIf c p = Match $ MatchMsg $ \msg ->
 forward :: Message -> ProcessId -> Process ()
 forward msg them = do
   proc <- ask
-  let node     = processNode proc
-      us       = processId proc
-      nid      = localNodeId node
-      destNode = (processNodeId them)
-  case destNode == nid of
+  let us   = processId proc
+      node = processNode proc
+  case isLocal proc them of
     True  -> sendCtrlMsg Nothing (LocalSend them msg)
-    False -> liftIO $ sendPayload (processNode proc)
-                                  (ProcessIdentifier (processId proc))
+    False -> liftIO $ sendPayload node
+                                  (ProcessIdentifier us)
                                   (ProcessIdentifier them)
                                   NoImplicitReconnect
                                   (messageToPayload msg)
@@ -1097,6 +1091,9 @@ reconnectPort them = do
 --------------------------------------------------------------------------------
 -- Auxiliary functions                                                        --
 --------------------------------------------------------------------------------
+
+isLocal :: LocalProcess -> ProcessId -> Bool
+isLocal proc them = localNodeId (processNode proc) == processNodeId them
 
 sendLocal :: (Serializable a) => ProcessId -> a -> Process ()
 sendLocal to msg =
